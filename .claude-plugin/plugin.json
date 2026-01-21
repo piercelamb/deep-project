@@ -1,0 +1,19 @@
+{
+  "name": "deep-project",
+  "description": "Split vague project requirements into well-scoped units for /deep-plan",
+  "version": "0.1.0",
+  "author": {
+    "name": "piercelamb",
+    "url": "https://github.com/piercelamb"
+  },
+  "repository": "https://github.com/piercelamb/deep-project",
+  "license": "MIT",
+  "keywords": ["planning", "decomposition", "project-management", "requirements"],
+  "skills": [
+    {
+      "name": "deep-project",
+      "description": "Decompose vague project requirements into well-scoped planning units",
+      "entrypoint": "skills/deep-project/SKILL.md"
+    }
+  ]
+}
