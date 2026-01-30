@@ -1,4 +1,7 @@
-"""Tests for setup-session.py script."""
+"""Tests for setup-session.py script.
+
+Design principle: State is derived from file existence, not JSON fields.
+"""
 
 import json
 import subprocess
@@ -10,7 +13,7 @@ import pytest
 class TestValidateInputFile:
     """Tests for input file validation."""
 
-    def test_accepts_valid_md(self, tmp_planning_dir, mock_plugin_root):
+    def test_accepts_valid_md(self, tmp_planning_dir, mock_plugin_root, mock_session_id):
         """Should accept .md file with content."""
         input_file = tmp_planning_dir / "rough_plan.md"
 
@@ -18,7 +21,8 @@ class TestValidateInputFile:
             [
                 "uv", "run", "scripts/checks/setup-session.py",
                 "--file", str(input_file),
-                "--plugin-root", str(mock_plugin_root)
+                "--plugin-root", str(mock_plugin_root),
+                "--session-id", mock_session_id,
             ],
             capture_output=True,
             text=True,
@@ -111,7 +115,7 @@ class TestValidateInputFile:
 class TestSetupSessionScript:
     """Integration tests for setup-session.py CLI."""
 
-    def test_new_session(self, tmp_planning_dir, mock_plugin_root):
+    def test_new_session(self, tmp_planning_dir, mock_plugin_root, mock_session_id):
         """Should detect new session, return mode='new'."""
         input_file = tmp_planning_dir / "rough_plan.md"
 
@@ -119,7 +123,8 @@ class TestSetupSessionScript:
             [
                 "uv", "run", "scripts/checks/setup-session.py",
                 "--file", str(input_file),
-                "--plugin-root", str(mock_plugin_root)
+                "--plugin-root", str(mock_plugin_root),
+                "--session-id", mock_session_id,
             ],
             capture_output=True,
             text=True,
@@ -130,25 +135,25 @@ class TestSetupSessionScript:
         assert output["mode"] == "new"
         assert output["resume_from_step"] == 1
 
-    def test_resume_session(self, tmp_planning_dir, mock_plugin_root):
+    def test_resume_session(self, tmp_planning_dir, mock_plugin_root, mock_session_id):
         """Should detect resume, return correct step."""
         input_file = tmp_planning_dir / "rough_plan.md"
 
-        # Create interview file to simulate partial progress
+        # Create interview file to simulate partial progress (checkpoint)
         (tmp_planning_dir / "deep_project_interview.md").write_text("# Interview")
 
-        # Create config to simulate existing session
-        (tmp_planning_dir / "deep_project_config.json").write_text(json.dumps({
-            "plugin_root": str(mock_plugin_root),
-            "planning_dir": str(tmp_planning_dir),
-            "initial_file": str(input_file)
+        # Create minimal session state to simulate existing session
+        (tmp_planning_dir / "deep_project_session.json").write_text(json.dumps({
+            "input_file_hash": "sha256:abc123",
+            "session_created_at": "2024-01-19T10:30:00Z",
         }))
 
         result = subprocess.run(
             [
                 "uv", "run", "scripts/checks/setup-session.py",
                 "--file", str(input_file),
-                "--plugin-root", str(mock_plugin_root)
+                "--plugin-root", str(mock_plugin_root),
+                "--session-id", mock_session_id,
             ],
             capture_output=True,
             text=True,
@@ -159,7 +164,7 @@ class TestSetupSessionScript:
         assert output["mode"] == "resume"
         assert output["resume_from_step"] == 2  # After interview
 
-    def test_warns_on_file_change(self, tmp_planning_dir, mock_plugin_root):
+    def test_warns_on_file_change(self, tmp_planning_dir, mock_plugin_root, mock_session_id):
         """Should warn if input file changed since session start."""
         input_file = tmp_planning_dir / "rough_plan.md"
 
@@ -168,23 +173,18 @@ class TestSetupSessionScript:
             [
                 "uv", "run", "scripts/checks/setup-session.py",
                 "--file", str(input_file),
-                "--plugin-root", str(mock_plugin_root)
+                "--plugin-root", str(mock_plugin_root),
+                "--session-id", mock_session_id,
             ],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent
         )
 
-        # Create session state with old hash
+        # Create session state with old hash (simulating file change)
         (tmp_planning_dir / "deep_project_session.json").write_text(json.dumps({
             "input_file_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
             "session_created_at": "2024-01-19T10:30:00Z",
-            "interview_complete": False,
-            "proposed_splits": [],
-            "splits_confirmed": False,
-            "completion_status": {},
-            "manifest_written": False,
-            "outcome": None
         }))
 
         # Second run should detect change
@@ -192,7 +192,8 @@ class TestSetupSessionScript:
             [
                 "uv", "run", "scripts/checks/setup-session.py",
                 "--file", str(input_file),
-                "--plugin-root", str(mock_plugin_root)
+                "--plugin-root", str(mock_plugin_root),
+                "--session-id", mock_session_id,
             ],
             capture_output=True,
             text=True,
@@ -206,7 +207,7 @@ class TestSetupSessionScript:
         assert len(output["warnings"]) == 1
         assert "changed" in output["warnings"][0].lower()
 
-    def test_json_output_format(self, tmp_planning_dir, mock_plugin_root):
+    def test_json_output_format(self, tmp_planning_dir, mock_plugin_root, mock_session_id):
         """Output should be valid JSON with expected fields."""
         input_file = tmp_planning_dir / "rough_plan.md"
 
@@ -214,7 +215,8 @@ class TestSetupSessionScript:
             [
                 "uv", "run", "scripts/checks/setup-session.py",
                 "--file", str(input_file),
-                "--plugin-root", str(mock_plugin_root)
+                "--plugin-root", str(mock_plugin_root),
+                "--session-id", mock_session_id,
             ],
             capture_output=True,
             text=True,
@@ -231,6 +233,10 @@ class TestSetupSessionScript:
         assert "plugin_root" in output
         assert "resume_from_step" in output
         assert "state" in output
-        assert "existing_splits" in output
+        assert "split_directories" in output
+        assert "splits_needing_specs" in output
         assert "warnings" in output
-        assert "todos" in output
+        # New task system fields (replaces todos)
+        assert "tasks_written" in output
+        assert "task_list_id" in output
+        assert "session_id_source" in output

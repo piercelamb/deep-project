@@ -8,12 +8,5 @@
   },
   "repository": "https://github.com/piercelamb/deep-project",
   "license": "MIT",
-  "keywords": ["planning", "decomposition", "project-management", "requirements"],
-  "skills": [
-    {
-      "name": "deep-project",
-      "description": "Decompose vague project requirements into well-scoped planning units",
-      "entrypoint": "skills/deep-project/SKILL.md"
-    }
-  ]
+  "keywords": ["planning", "decomposition", "project-management", "requirements"]
 }

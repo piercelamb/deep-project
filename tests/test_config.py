@@ -1,5 +1,8 @@
 # tests/test_config.py
-"""Tests for session configuration management module."""
+"""Tests for session state management module.
+
+Design principle: Session JSON is minimal, state derived from files.
+"""
 
 import json
 import os
@@ -13,21 +16,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from lib.config import (
     _atomic_write,
     compute_file_hash,
-    session_config_path,
     session_state_path,
-    session_config_exists,
-    load_session_config,
-    save_session_config,
+    session_state_exists,
     load_session_state,
     save_session_state,
-    create_session_config,
     create_initial_session_state,
-    get_or_create_session_config,
     check_input_file_changed,
-    CONFIG_FILENAME,
     SESSION_FILENAME,
     SessionFilename,
-    SessionConfig,
     SessionState,
 )
 
@@ -183,94 +179,22 @@ class TestComputeFileHash:
         assert compute_file_hash(str(file1)) != compute_file_hash(str(file2))
 
 
-class TestSessionConfig:
-    """Tests for session config management."""
-
-    def test_session_config_path(self, tmp_path):
-        """Should return correct path to config file."""
-        path = session_config_path(str(tmp_path))
-        assert path == tmp_path / CONFIG_FILENAME
+class TestSessionState:
+    """Tests for session state management."""
 
     def test_session_state_path(self, tmp_path):
         """Should return correct path to state file."""
         path = session_state_path(str(tmp_path))
         assert path == tmp_path / SESSION_FILENAME
 
-    def test_session_config_exists_false(self, tmp_path):
-        """Should return False when no config exists."""
-        assert session_config_exists(str(tmp_path)) is False
+    def test_session_state_exists_false(self, tmp_path):
+        """Should return False when no state exists."""
+        assert session_state_exists(str(tmp_path)) is False
 
-    def test_session_config_exists_true(self, tmp_path):
-        """Should return True when config exists."""
-        (tmp_path / CONFIG_FILENAME).write_text('{}')
-        assert session_config_exists(str(tmp_path)) is True
-
-    def test_creates_new_config(self, tmp_path):
-        """Should create config file when none exists."""
-        config = create_session_config(
-            planning_dir=str(tmp_path),
-            plugin_root="/plugin",
-            initial_file=str(tmp_path / "spec.md")
-        )
-
-        assert (tmp_path / CONFIG_FILENAME).exists()
-        assert config["plugin_root"] == "/plugin"
-        assert config["planning_dir"] == str(tmp_path)
-
-    def test_loads_existing_config(self, tmp_path):
-        """Should load existing config without modification."""
-        config_data = {"key": "value", "nested": {"a": 1}}
-        (tmp_path / CONFIG_FILENAME).write_text(json.dumps(config_data))
-
-        loaded = load_session_config(str(tmp_path))
-
-        assert loaded == config_data
-
-    def test_handles_corrupted_json(self, tmp_path):
-        """Should raise ValueError for corrupted config."""
-        (tmp_path / CONFIG_FILENAME).write_text("not valid json {{{")
-
-        with pytest.raises(ValueError) as exc_info:
-            load_session_config(str(tmp_path))
-
-        assert "Corrupted" in str(exc_info.value)
-
-    def test_raises_for_missing_config(self, tmp_path):
-        """Should raise FileNotFoundError when loading missing config."""
-        with pytest.raises(FileNotFoundError):
-            load_session_config(str(tmp_path))
-
-    def test_get_or_create_returns_was_created_true(self, tmp_path):
-        """Should return (config, True) when creating new config."""
-        input_file = tmp_path / "spec.md"
-        input_file.write_text("# Test")
-
-        config, was_created = get_or_create_session_config(
-            planning_dir=str(tmp_path),
-            plugin_root="/plugin",
-            initial_file=str(input_file)
-        )
-
-        assert was_created is True
-        assert config["plugin_root"] == "/plugin"
-
-    def test_get_or_create_returns_was_created_false(self, tmp_path):
-        """Should return (config, False) when config exists."""
-        existing_config = {"existing": "config"}
-        (tmp_path / CONFIG_FILENAME).write_text(json.dumps(existing_config))
-
-        config, was_created = get_or_create_session_config(
-            planning_dir=str(tmp_path),
-            plugin_root="/plugin",
-            initial_file=str(tmp_path / "spec.md")
-        )
-
-        assert was_created is False
-        assert config == existing_config
-
-
-class TestSessionState:
-    """Tests for session state management."""
+    def test_session_state_exists_true(self, tmp_path):
+        """Should return True when state exists."""
+        (tmp_path / SESSION_FILENAME).write_text('{}')
+        assert session_state_exists(str(tmp_path)) is True
 
     def test_returns_none_if_no_state(self, tmp_path):
         """Should return None if no session state file."""
@@ -280,8 +204,8 @@ class TestSessionState:
     def test_loads_existing_state(self, tmp_path):
         """Should load state from file."""
         state_data = {
-            "interview_complete": True,
-            "proposed_splits": [{"index": 1, "dir_name": "01-test"}]
+            "input_file_hash": "sha256:abc",
+            "session_created_at": "2024-01-01T00:00:00Z",
         }
         (tmp_path / SESSION_FILENAME).write_text(json.dumps(state_data))
 
@@ -308,21 +232,17 @@ class TestSessionState:
 
         assert "Corrupted" in str(exc_info.value)
 
-    def test_creates_initial_state_with_hash(self, tmp_path):
-        """Initial state should include file hash."""
+    def test_creates_initial_state_minimal(self, tmp_path):
+        """Initial state should be minimal with file hash."""
         input_file = tmp_path / "requirements.md"
         input_file.write_text("# Requirements")
 
         state = create_initial_session_state(str(input_file))
 
-        assert "input_file_hash" in state
+        # Only these fields should exist
+        assert set(state.keys()) == {"input_file_hash", "session_created_at"}
         assert state["input_file_hash"].startswith("sha256:")
         assert "session_created_at" in state
-        assert state["interview_complete"] is False
-        assert state["proposed_splits"] == []
-        assert state["splits_confirmed"] is False
-        assert state["manifest_written"] is False
-        assert state["outcome"] is None
 
 
 class TestInputFileChanged:
@@ -370,126 +290,59 @@ class TestInputFileChanged:
 class TestSessionFilenameEnum:
     """Tests for SessionFilename StrEnum."""
 
-    def test_config_value(self):
-        """CONFIG should be correct filename."""
-        assert SessionFilename.CONFIG == "deep_project_config.json"
-
     def test_state_value(self):
         """STATE should be correct filename."""
         assert SessionFilename.STATE == "deep_project_session.json"
 
+    def test_interview_value(self):
+        """INTERVIEW should be correct filename."""
+        assert SessionFilename.INTERVIEW == "deep_project_interview.md"
+
+    def test_manifest_value(self):
+        """MANIFEST should be correct filename."""
+        assert SessionFilename.MANIFEST == "project-manifest.md"
+
     def test_is_string(self):
         """StrEnum values should be usable as strings."""
-        assert isinstance(SessionFilename.CONFIG, str)
-        path = Path("/tmp") / SessionFilename.CONFIG
-        assert str(path) == "/tmp/deep_project_config.json"
-
-
-class TestSessionConfigDataclass:
-    """Tests for SessionConfig dataclass."""
-
-    def test_from_dict_valid(self):
-        """Should create SessionConfig from valid dict."""
-        data = {
-            "plugin_root": "/plugin",
-            "planning_dir": "/planning",
-            "initial_file": "/planning/spec.md",
-        }
-
-        config = SessionConfig.from_dict(data)
-
-        assert config.plugin_root == "/plugin"
-        assert config.planning_dir == "/planning"
-        assert config.initial_file == "/planning/spec.md"
-
-    def test_from_dict_missing_field(self):
-        """Should raise ValueError if required field missing."""
-        data = {"plugin_root": "/plugin"}
-
-        with pytest.raises(ValueError) as exc_info:
-            SessionConfig.from_dict(data)
-
-        assert "Missing required config fields" in str(exc_info.value)
-
-    def test_to_dict(self):
-        """Should convert to dict for serialization."""
-        config = SessionConfig(
-            plugin_root="/plugin",
-            planning_dir="/planning",
-            initial_file="/planning/spec.md",
-        )
-
-        result = config.to_dict()
-
-        assert result == {
-            "plugin_root": "/plugin",
-            "planning_dir": "/planning",
-            "initial_file": "/planning/spec.md",
-        }
+        assert isinstance(SessionFilename.STATE, str)
+        path = Path("/tmp") / SessionFilename.STATE
+        assert str(path) == "/tmp/deep_project_session.json"
 
 
 class TestSessionStateDataclass:
     """Tests for SessionState dataclass."""
 
-    def test_from_dict_valid(self):
-        """Should create SessionState from valid dict."""
+    def test_from_dict_minimal(self):
+        """Should create SessionState from minimal dict."""
         data = {
             "input_file_hash": "sha256:abc123",
             "session_created_at": "2024-01-01T00:00:00Z",
-            "interview_complete": True,
-            "proposed_splits": [{"index": 1}],
-            "splits_confirmed": True,
-            "completion_status": {"01": {"done": True}},
-            "manifest_written": False,
-            "outcome": "splitting",
         }
 
         state = SessionState.from_dict(data)
 
         assert state.input_file_hash == "sha256:abc123"
-        assert state.interview_complete is True
-        assert state.outcome == "splitting"
+        assert state.session_created_at == "2024-01-01T00:00:00Z"
 
     def test_from_dict_legacy_mtime_field(self):
         """Should handle legacy input_file_mtime field name."""
         data = {
             "input_file_hash": "sha256:abc123",
             "input_file_mtime": "2024-01-01T00:00:00Z",
-            "interview_complete": False,
-            "proposed_splits": [],
-            "splits_confirmed": False,
-            "manifest_written": False,
-            "outcome": None,
         }
 
         state = SessionState.from_dict(data)
 
         assert state.session_created_at == "2024-01-01T00:00:00Z"
 
-    def test_from_dict_missing_field(self):
-        """Should raise ValueError if required field missing."""
-        data = {"input_file_hash": "sha256:abc123"}
-
-        with pytest.raises(ValueError) as exc_info:
-            SessionState.from_dict(data)
-
-        assert "Missing required state fields" in str(exc_info.value)
-
     def test_to_dict(self):
         """Should convert to dict for serialization."""
         state = SessionState(
             input_file_hash="sha256:abc",
             session_created_at="2024-01-01T00:00:00Z",
-            interview_complete=False,
-            proposed_splits=[],
-            splits_confirmed=False,
-            completion_status={},
-            manifest_written=False,
-            outcome=None,
         )
 
         result = state.to_dict()
 
         assert result["input_file_hash"] == "sha256:abc"
         assert result["session_created_at"] == "2024-01-01T00:00:00Z"
-        assert result["outcome"] is None

@@ -1,17 +1,26 @@
 # Split Heuristics
 
+## Context to Read
+
+Before analyzing splits:
+- `{initial_file}` - The original requirements
+- `{planning_dir}/deep_project_interview.md` - Interview transcript with user clarifications
+
+## Overview
+
+/deep-plan is a Claude Code plugin that transforms requirements into detailed implementation plans via research, interviews, and multi-LLM review.
+
+The goal of a split is to create a unit of work that is ideal for deeper planning via the /deep-plan plugin. We do not want to pass vague ideas that are too broad to /deep-plan (the plan will become too much context) and we do not want to pass small/targeted units of work to /deep-plan (it will be overkill for them). Your goal is to find the ideal split that has natural boundaries and will benefit from much deeper/thorough planning without being too broad.
+
 ## Good Split Characteristics
 
 A well-formed split has:
 
 **Cohesive purpose**
-- One clear goal or outcome
-- Easy to describe in one sentence
-- "This split does X"
+- A clear goal or outcome
 
 **Bounded complexity**
-- 3-8 major components
-- Estimable effort (1-3 focused implementation sessions)
+- 1 to few major components
 - Fits in one person's head
 
 **Clear interfaces**
@@ -41,11 +50,11 @@ Split is too large if:
 
 ## Signs of Too Small
 
-Split is too small if:
+These signs indicate you've split too granularly - combine with adjacent work or keep as single unit:
 
 - **Single function or trivial CRUD**
   - "Add a button that calls an API"
-  - Too granular for /deep-plan
+  - Not enough substance for a standalone split
 
 - **No architectural decisions needed**
   - Implementation is obvious
@@ -55,47 +64,25 @@ Split is too small if:
   - Requirements fit in a paragraph
   - No discovery needed
 
-- **Planning overhead > implementation time**
-  - If writing the spec takes longer than writing the code
-  - Just do it directly
-
 ## Not Splittable (Single Unit)
 
 Some projects don't benefit from multiple splits:
 
-### Reasons for Single Unit
-
-1. **Too small overall**
-   - Entire project is one bounded piece of work
-   - Multiple splits would be artificial
-
-2. **Too unclear even after interview**
-   - Can't determine boundaries without implementation
-   - Need /deep-plan to explore first
-
-3. **Single coherent system**
+1. **Single coherent system**
    - Tightly coupled components
    - Artificial separation would create overhead
 
-### Single Unit Workflow
+2. **Too unclear even after interview**
+   - Can't determine boundaries without implementation
+   - Need /deep-plan to explore and discover structure
 
-When project is not splittable:
+**Workflow:** Create `01-{project-name}/spec.md` with interview context. Next step: `/deep-plan @01-name/spec.md`
 
-1. Create single subdir: `01-{project-name}/`
-2. Write spec.md with all interview context
-3. Spec includes notes for /deep-plan exploration
-4. Manifest reflects single-unit structure
-
-**This is a valid workflow outcome, not a failure.**
-
-Benefits:
-- Interview insights preserved in spec.md
-- Consistent output structure (always directories + specs)
-- Uniform next step: `/deep-plan @01-name/spec.md`
+Single-unit output is not a failure - it's a valid outcome that preserves interview insights in a consistent structure.
 
 ## Dependency Types
 
-When splits have dependencies, categorize them:
+When splits have dependencies, categorize them, for e.g.:
 
 **models**
 - Data structures, domain objects
@@ -149,10 +136,5 @@ Is it clearly multiple distinct systems?
          v
 Can you identify 2+ cohesive, bounded pieces?
     Yes -> Propose multi-split structure
-    No  -> Continue
-         |
-         v
-Is the project too small for /deep-plan?
-    Yes -> Single unit (01-project-name/) with minimal spec
-    No  -> Single unit (01-project-name/) with full spec
+    No  -> Single unit (01-project-name/spec.md)
 ```

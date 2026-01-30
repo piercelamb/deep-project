@@ -1,37 +1,47 @@
-"""State detection for /deep-project resume support."""
+"""State detection for /deep-project resume support.
+
+Design principle: Derive state from file existence, not JSON fields.
+
+Checkpoints (files):
+- deep_project_interview.md exists → interview complete (resume at step 2)
+- project-manifest.md exists → proposal complete (resume at step 4)
+- NN-name/ directories exist → directories created (resume at step 6)
+- NN-name/spec.md exists for all splits → specs complete (resume at step 7)
+
+Session JSON stores only:
+- input_file_hash (detect changes)
+- session_created_at (metadata)
+"""
 
 import re
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
-from .config import load_session_state
+from .config import SessionFilename
 
 
 class DetectStateResult(TypedDict):
     """Return type for detect_state() function."""
 
     interview_complete: bool
-    splits_proposed: bool
-    splits_confirmed: bool
-    directories_created: bool
     manifest_created: bool
+    directories_created: bool
     splits: list[str]
     splits_with_specs: list[str]
     resume_step: int
-    session_state: dict[str, Any] | None
-    outcome: str | None
 
 
 # Workflow steps mapping step number to step name.
-# Step 0 is setup/validation, steps 1-6 are the main workflow phases.
+# Step 0 is setup/validation, steps 1-7 are the main workflow phases.
 STEPS = {
     0: "setup",
     1: "interview",
     2: "split_analysis",
     3: "dependency_discovery",
     4: "user_confirmation",
-    5: "output_generation",
-    6: "complete"
+    5: "directory_creation",
+    6: "spec_generation",
+    7: "complete"
 }
 
 # Strict pattern for split directories: NN-kebab-case.
@@ -51,87 +61,61 @@ def get_split_index(name: str) -> int:
 
 
 def detect_state(planning_dir: Path | str) -> DetectStateResult:
-    """Detect current workflow state.
+    """Detect current workflow state from file existence.
 
-    Uses deep_project_session.json as authoritative source when available,
-    with filesystem scanning as validation/fallback.
+    Derives state from filesystem checkpoints:
+    - Interview complete: deep_project_interview.md exists
+    - Manifest created: project-manifest.md exists (Claude's proposal)
+    - Directories created: NN-name/ directories exist (user confirmed)
+    - Specs written: spec.md in each directory
     """
     planning_dir = Path(planning_dir)
 
-    # Try to load authoritative session state first
-    session_state = load_session_state(str(planning_dir))
+    # Checkpoint 1: Interview complete (file exists)
+    interview_complete = (planning_dir / SessionFilename.INTERVIEW).exists()
 
-    # Check for interview transcript (filesystem)
-    interview_exists = (planning_dir / "deep_project_interview.md").exists()
+    # Checkpoint 2: Manifest created (Claude's proposal)
+    manifest_created = (planning_dir / SessionFilename.MANIFEST).exists()
 
-    # Check for split directories with strict validation
+    # Checkpoint 3: Split directories exist (user confirmed, output generation started)
     splits = sorted([
         d.name for d in planning_dir.iterdir()
         if d.is_dir() and is_valid_split_dir(d.name)
     ], key=get_split_index)
 
-    # Check if splits have spec.md files
+    # Checkpoint 4: Specs written (spec.md in each directory)
     splits_with_specs = [
         s for s in splits
         if (planning_dir / s / "spec.md").exists()
     ]
 
-    # Check for manifest
-    manifest_exists = (planning_dir / "project-manifest.md").exists()
+    # Derive higher-level state
+    directories_created = len(splits) > 0
 
-    # Determine state from session.json (authoritative) or fallback to filesystem
-    if session_state:
-        # Use session.json as source of truth
-        proposed_splits = session_state.get("proposed_splits", [])
-        declared_split_count = len(proposed_splits)
-
-        # Check completion: ALL declared splits must have specs + manifest
-        all_specs_written = all(
-            session_state.get("completion_status", {}).get(s["dir_name"], {}).get("spec_written", False)
-            for s in proposed_splits
-        ) if proposed_splits else False
-
-        is_complete = (
-            session_state.get("manifest_written", False) and
-            all_specs_written and
-            declared_split_count > 0
-        )
-
-        # Determine resume step from session state
-        if is_complete:
-            resume_step = 6
-        elif session_state.get("splits_confirmed"):
-            resume_step = 5  # Output generation
-        elif session_state.get("interview_complete"):
-            resume_step = 2  # Split analysis
-        else:
-            resume_step = 1  # Interview
-
-        # Handle "not_splittable" outcome (single subdir created)
-        if session_state.get("outcome") == "not_splittable":
-            resume_step = 6  # Treat as complete (single subdir with spec created)
+    # Determine resume step from checkpoints
+    # Note: Step 3 and 5 are never resume points - they happen inline after steps 2 and 4
+    if directories_created and splits_with_specs and len(splits_with_specs) == len(splits):
+        resume_step = 7  # Complete (all specs written)
+    elif directories_created:
+        # Directories exist, need to write specs
+        resume_step = 6  # Spec generation
+    elif manifest_created:
+        # Manifest exists but no directories, need user confirmation then directory creation
+        resume_step = 4  # User confirmation
+    elif interview_complete:
+        # Interview done, need to analyze and propose splits
+        resume_step = 2  # Split analysis + dependency discovery
     else:
-        # Fallback: infer from filesystem (less reliable)
-        if manifest_exists and len(splits_with_specs) == len(splits) and splits:
-            resume_step = 6  # Complete
-        elif splits:
-            resume_step = 5  # Output generation
-        elif interview_exists:
-            resume_step = 2  # Split analysis
-        else:
-            resume_step = 1  # Interview
+        # Start from interview
+        resume_step = 1  # Interview
 
     return {
-        "interview_complete": session_state.get("interview_complete", interview_exists) if session_state else interview_exists,
-        "splits_proposed": len(session_state.get("proposed_splits", [])) > 0 if session_state else len(splits) > 0,
-        "splits_confirmed": session_state.get("splits_confirmed", False) if session_state else len(splits_with_specs) > 0,
-        "directories_created": len(splits) > 0,
-        "manifest_created": manifest_exists,
+        "interview_complete": interview_complete,
+        "manifest_created": manifest_created,
+        "directories_created": directories_created,
         "splits": splits,
         "splits_with_specs": splits_with_specs,
         "resume_step": resume_step,
-        "session_state": session_state,
-        "outcome": session_state.get("outcome") if session_state else None
     }
 
 
@@ -163,14 +147,18 @@ def generate_todos(
     ]
 
     # Workflow items
+    # Note: Steps 3 and 5 are never resume points - they happen inline
+    # Step 3 ends with writing project-manifest.md (checkpoint for step 4)
+    # Step 5 ends with directories created (checkpoint for step 6)
     workflow_items = [
         ("Validate input and setup session", "Setting up session", 0),
         ("Conduct interview", "Interviewing user", 1),
-        ("Analyze and propose splits", "Analyzing splits", 2),
-        ("Discover dependencies", "Discovering dependencies", 3),
+        ("Analyze splits", "Analyzing splits", 2),
+        ("Discover dependencies and write manifest", "Writing manifest", 3),
         ("Confirm splits with user", "Confirming splits", 4),
-        ("Generate output files", "Generating output", 5),
-        ("Output summary", "Outputting summary", 6),
+        ("Create split directories", "Creating directories", 5),
+        ("Generate spec files", "Generating specs", 6),
+        ("Output summary", "Outputting summary", 7),
     ]
 
     todos = context_items.copy()

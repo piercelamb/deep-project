@@ -1,5 +1,6 @@
 """Shared fixtures for /deep-project tests."""
 
+import os
 import pytest
 from pathlib import Path
 
@@ -8,6 +9,33 @@ from pathlib import Path
 def fixtures_dir():
     """Return path to test fixtures directory."""
     return Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def mock_session_id():
+    """Return a mock session ID for testing."""
+    return "test-session-12345"
+
+
+@pytest.fixture
+def mock_session_env(mock_session_id, monkeypatch):
+    """Set CLAUDE_SESSION_ID environment variable for testing."""
+    monkeypatch.setenv("CLAUDE_SESSION_ID", mock_session_id)
+    return mock_session_id
+
+
+@pytest.fixture
+def mock_tasks_dir(tmp_path, mock_session_id, monkeypatch):
+    """Create mock tasks directory and patch Path.home() to use it."""
+    mock_home = tmp_path / "mock_home"
+    mock_home.mkdir()
+    tasks_dir = mock_home / ".claude" / "tasks" / mock_session_id
+    tasks_dir.mkdir(parents=True)
+
+    # Patch Path.home() to return mock_home
+    monkeypatch.setattr(Path, "home", lambda: mock_home)
+
+    return tasks_dir
 
 
 @pytest.fixture

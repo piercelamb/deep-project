@@ -1,19 +1,19 @@
 # Interview Protocol
 
+## Context to Read
+
+Before starting the interview:
+- `{initial_file}` - The requirements file passed by user
+
 ## Philosophy
 
-The interview surfaces the user's mental model. Claude has freedom to ask questions adaptively - there's no fixed number of rounds. The goal is understanding, not interrogation.
+The interview surfaces the user's mental model. Claude has freedom to ask questions adaptively - there's no fixed number of rounds. The goal is understanding is reconciling context from the users brain with claude's intelligence.
 
 ## Core Topics to Cover
 
 ### 1. Natural Boundaries
 
-Discover how the user naturally thinks about dividing the work.
-
-**Questions to explore:**
-- "What feels like separate pieces of work?"
-- "Where would you draw lines if handing to different engineers?"
-- "Are there distinct systems or components in your mind?"
+Try to discover how the user naturally thinks about dividing the work while also providing your advice for how it might be split. Try to identify foundational systems.
 
 **Listen for:**
 - Repeated mentions of specific modules or features
@@ -22,12 +22,7 @@ Discover how the user naturally thinks about dividing the work.
 
 ### 2. Ordering Intuition
 
-Understand what needs to come first.
-
-**Questions to explore:**
-- "What's foundational that everything else builds on?"
-- "What needs to exist before other things can be built?"
-- "If you could only have one part working, which would it be?"
+Understand what needs to come first or is foundational. Tease context out of the users mind about dependencies and combine it with your advice.
 
 **Listen for:**
 - Mentions of "core" or "foundation"
@@ -36,12 +31,7 @@ Understand what needs to come first.
 
 ### 3. Uncertainty Mapping
 
-Identify what's clear vs. what needs exploration.
-
-**Questions to explore:**
-- "Which parts are you most confident about?"
-- "Where are you still figuring things out?"
-- "What decisions haven't been made yet?"
+Identify what's clear vs. what needs exploration. Extract detail from the user on the most vague pieces while combining your knowledge.
 
 **Listen for:**
 - Hesitation or qualifiers ("maybe", "probably", "I think")
@@ -51,28 +41,9 @@ Identify what's clear vs. what needs exploration.
 **Why it matters:**
 Uncertain parts may need dedicated splits for /deep-plan exploration. Don't assume - flag it.
 
-### 4. Scope Calibration
-
-Understand the size and effort involved.
-
-**Questions to explore:**
-- "Is this a weekend project or a month-long effort?"
-- "How much of this is new vs. connecting existing pieces?"
-- "What's the MVP vs. the full vision?"
-
-**Listen for:**
-- Time estimates or expectations
-- Phase descriptions ("first we need..., then...")
-- Must-have vs. nice-to-have distinctions
-
-### 5. Existing Context
+### 4. Existing Context
 
 Capture constraints and integration points.
-
-**Questions to explore:**
-- "Is there existing code this needs to work with?"
-- "Are there technical constraints I should know about?"
-- "What's the tech stack or platform?"
 
 **Listen for:**
 - Specific technologies, frameworks, or patterns
@@ -86,8 +57,8 @@ Capture constraints and integration points.
 Stop the interview when you have enough information to:
 
 1. **Propose a split structure the user will recognize**
-   - Splits should match their mental model
-   - May be a single unit if project is coherent
+   - Splits should match the mental model you and the user have been constructing
+   - May be a single unit if project is small enough / coherent
 
 2. **Identify dependencies between splits** (if multiple)
    - What needs what
@@ -104,25 +75,4 @@ Stop the interview when you have enough information to:
 
 ## Output
 
-After the interview, maintain an internal model of:
-
-### Proposed Splits
-- Name (descriptive, kebab-case-friendly)
-- Purpose (one sentence)
-- Rough scope (what's included)
-
-*Note: May be a single unit if project is naturally coherent*
-
-### Dependencies (if multiple splits)
-- Which split needs what from which
-- Type: models, APIs, schemas, patterns
-- Status: to-be-defined, defined, implemented
-
-### Parallel Groups (if multiple splits)
-- Which splits are independent
-- Which depend only on interfaces (can define upfront)
-
-### Key Clarifications
-- Decisions made during interview
-- Context that affects implementation
-- Uncertainties that need resolution during planning
+After the interview, write `{planning_dir}/deep_project_interview.md` with a complete transcript of the interview.
