@@ -1,7 +1,7 @@
 {
   "name": "deep-project",
   "description": "Split vague project requirements into well-scoped units for /deep-plan",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "piercelamb",
     "url": "https://github.com/piercelamb"

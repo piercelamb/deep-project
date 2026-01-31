@@ -90,7 +90,7 @@ def check_for_conflict(
     """Check for conflicting existing tasks.
 
     Only conflicts when user explicitly set CLAUDE_CODE_TASK_LIST_ID.
-    Session-based task lists (CLAUDE_SESSION_ID) = resume scenario, no conflict.
+    Session-based task lists (DEEP_SESSION_ID) = resume scenario, no conflict.
 
     Args:
         task_list_id: The task list ID to check

@@ -27,15 +27,17 @@ def main() -> int:
     if not session_id:
         return 0
 
-    # PRIMARY: Output to Claude's context via additionalContext
-    # This works even when CLAUDE_ENV_FILE is unavailable or after /clear reset
-    output = {
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": f"DEEP_PROJECT_SESSION_ID={session_id}",
+    # Check if DEEP_SESSION_ID is already set correctly
+    existing_session_id = os.environ.get("DEEP_SESSION_ID")
+    if existing_session_id != session_id:
+        # Not set or doesn't match - output to Claude's context via additionalContext
+        output = {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": f"DEEP_SESSION_ID={session_id}",
+            }
         }
-    }
-    print(json.dumps(output))
+        print(json.dumps(output))
 
     # SECONDARY: Also try CLAUDE_ENV_FILE for bash commands (may not work)
     env_file = os.environ.get("CLAUDE_ENV_FILE")
@@ -49,8 +51,8 @@ def main() -> int:
                 pass
 
             lines_to_write = []
-            if f"CLAUDE_SESSION_ID={session_id}" not in existing_content:
-                lines_to_write.append(f"export CLAUDE_SESSION_ID={session_id}\n")
+            if f"DEEP_SESSION_ID={session_id}" not in existing_content:
+                lines_to_write.append(f"export DEEP_SESSION_ID={session_id}\n")
             if (
                 transcript_path
                 and f"CLAUDE_TRANSCRIPT_PATH={transcript_path}" not in existing_content

@@ -18,7 +18,7 @@ class TaskListSource(StrEnum):
 
     CONTEXT = "context"  # From --session-id arg (hook's additionalContext)
     USER_ENV = "user_env"  # From CLAUDE_CODE_TASK_LIST_ID
-    SESSION = "session"  # From CLAUDE_SESSION_ID env var
+    SESSION = "session"  # From DEEP_SESSION_ID env var
     NONE = "none"  # No task list ID available
 
 
@@ -46,7 +46,7 @@ class TaskListContext:
         Priority order:
         1. --session-id (context) - from hook's additionalContext, most reliable
         2. CLAUDE_CODE_TASK_LIST_ID - user-specified, takes precedence over auto
-        3. CLAUDE_SESSION_ID - env var, may be stale after /clear
+        3. DEEP_SESSION_ID - env var, may be stale after /clear
 
         Args:
             context_session_id: Session ID from --session-id arg (passed by Claude
@@ -55,7 +55,7 @@ class TaskListContext:
         Returns:
             TaskListContext with resolved task_list_id and source
         """
-        env_session_id = os.environ.get("CLAUDE_SESSION_ID")
+        env_session_id = os.environ.get("DEEP_SESSION_ID")
         user_specified = os.environ.get("CLAUDE_CODE_TASK_LIST_ID")
 
         # Track if context and env matched (useful for debugging /clear issues)

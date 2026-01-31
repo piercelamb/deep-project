@@ -70,18 +70,18 @@ find ~ -path "*/deep_project/scripts/checks/setup-session.py" -type f 2>/dev/nul
 
 ### D. Run Setup Script
 
-**First, check for session_id in your context.** Look for `DEEP_PROJECT_SESSION_ID=xxx` which was set by the SessionStart hook. This is visible in your context from when the session started.
+**First, check for session_id in your context.** Look for `DEEP_SESSION_ID=xxx` which was set by the SessionStart hook. This is visible in your context from when the session started.
 
 Run the setup script with the requirements file:
 ```bash
-uv run {script_path} --file "{requirements_file_path}" --plugin-root "{plugin_root}" --session-id "{DEEP_PROJECT_SESSION_ID}"
+uv run {script_path} --file "{requirements_file_path}" --plugin-root "{plugin_root}" --session-id "{DEEP_SESSION_ID}"
 ```
 
 Where:
 - `{plugin_root}` is the directory two levels up from the script (e.g., if script is at `/path/to/deep_project/scripts/checks/setup-session.py`, plugin_root is `/path/to/deep_project`)
-- `{DEEP_PROJECT_SESSION_ID}` is from your context (if available)
+- `{DEEP_SESSION_ID}` is from your context (if available)
 
-**IMPORTANT:** If `DEEP_PROJECT_SESSION_ID` is in your context, you MUST pass it via `--session-id`. This ensures tasks work correctly after `/clear reset` commands. If it's not in your context, omit `--session-id` (fallback to env var).
+**IMPORTANT:** If `DEEP_SESSION_ID` is in your context, you MUST pass it via `--session-id`. This ensures tasks work correctly after `/clear reset` commands. If it's not in your context, omit `--session-id` (fallback to env var).
 
 Parse the JSON output.
 
