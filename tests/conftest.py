@@ -19,8 +19,8 @@ def mock_session_id():
 
 @pytest.fixture
 def mock_session_env(mock_session_id, monkeypatch):
-    """Set CLAUDE_SESSION_ID environment variable for testing."""
-    monkeypatch.setenv("CLAUDE_SESSION_ID", mock_session_id)
+    """Set DEEP_SESSION_ID environment variable for testing."""
+    monkeypatch.setenv("DEEP_SESSION_ID", mock_session_id)
     return mock_session_id
 
 
