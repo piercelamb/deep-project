@@ -8,6 +8,10 @@
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-Plugin-purple)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 
+> **Blog posts:**
+> - [The Deep Trilogy](https://pierce-lamb.medium.com/the-deep-trilogy-claude-code-plugins-for-writing-good-software-fast-33b76f2a022d) - How the three plugins work together
+> - [What I Learned](https://pierce-lamb.medium.com/what-i-learned-while-building-a-trilogy-of-claude-code-plugins-72121823172b) - Technical lessons from plugin development
+
 `/deep-project` transforms vague, high-level project requirements into well-scoped planning units through AI-assisted interview and decomposition. It ensures you've thought through every major component of the software you want to build and properly scoped them for thorough planning through [`/deep-plan`](https://github.com/piercelamb/deep-plan).
 
 This plugin is the first step in the deep planning pipeline. After decomposition, each unit can be fed to [`/deep-plan`](https://github.com/piercelamb/deep-plan) for comprehensive planning with research, external LLM review, and a TDD approach.
